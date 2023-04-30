@@ -1,5 +1,5 @@
 use gtk4 as gtk;
-use gtk::{prelude::*, Orientation, ScrolledWindow, TreeStore};
+use gtk::{prelude::*, Orientation, ScrolledWindow, TreeStore, SearchEntry};
 use gtk::{Application, ApplicationWindow, CellRendererText, TreeView, TreeViewColumn};
 use sysinfo::{ProcessExt, System, SystemExt};
 use std::thread::sleep;
@@ -193,10 +193,17 @@ fn build_ui(app: &Application) {
     scrolled_window.set_child(Some(&treeview));
     treeview.set_model(Some(&store));
 
+    //search bar
+    //let search_entry = SearchEntry::new();
+    scrolled_window.set_child(Some(&treeview));
+    
     let grid = gtk::Grid::new();
+   
     grid.attach(&scrolled_window, 0, 0, 1, 1);
-    // button.activate();
+    // grid.attach(&search_entry, 1, 1, 0, 0);
     grid.attach(&button, 0, 1, 1, 1);
+    // button.activate();
+    
     // button.connect_clicked(clone!(@weak store, @weak treeview => move |_| {
     //     let store = store.clone();
     //     let treeview = treeview.clone();
@@ -281,6 +288,26 @@ fn build_ui(app: &Application) {
                     Err(_) => {
                         println!("Failed to fetch process data");
                     }
+
+                    //search
+                    // search_entry.connect_changed(move |search_entry| {
+                    //     let query = search_entry.get_text().as_str().to_lowercase();
+                    //     let filtered_data = result
+                    //     .iter()
+                    //     .filter(|row| row.iter().any(|cell| cell.to_lowercase().contains(&query)))
+                    //     .cloned()
+                    //     .collect::<Vec<Vec<String>>>();
+                    //     store.clear();
+                    //     for row in &result {
+                    //         let tree_iter = store.append(None);
+                    //         store.set_value(&tree_iter, 0, &row[0].to_value());
+                    //         store.set_value(&tree_iter, 1, &row[1].to_value());
+                    //         store.set_value(&tree_iter, 2, &row[2].to_value());
+                    //         store.set_value(&tree_iter, 3, &row[3].to_value());
+                    //         store.set_value(&tree_iter, 4, &row[4].to_value());
+                    //         store.set_value(&tree_iter, 5, &row[5].to_value());
+                    //     }
+                    // });
                 }
                 *handle = Some(thread::spawn(move || fetch_process_data()));
             }
@@ -297,4 +324,6 @@ fn build_ui(app: &Application) {
         .build();
 
     window.show();
+
+    
 }

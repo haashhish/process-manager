@@ -35,6 +35,7 @@ fn build_ui(app: &Application) {
     .build();
 
     static mut flag:i32=0;
+    static mut refreshRate:u64 = 1000;
 
     fn SleepingFlag()
     {
@@ -312,7 +313,7 @@ fn build_ui(app: &Application) {
         let handle_clone = handle.clone();
 
 
-        glib::timeout_add_local(Duration::from_millis(1000), move || {
+        glib::timeout_add_local(Duration::from_millis(unsafe{refreshRate}), move || {
             let mut handle = handle_clone.lock().unwrap();
             if let Some(handle_inner) = handle.take() {
                 match handle_inner.join() {

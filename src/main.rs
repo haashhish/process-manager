@@ -9,9 +9,10 @@ use glib::clone;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use glib::source::Continue;
-use std::borrow::Borrow;
+use std::borrow::{Borrow, BorrowMut};
 use users::{get_current_uid, get_user_by_uid};
 use std::sync::mpsc;
+use std::cell::RefCell;
 const APP_ID: &str = "org.gtk_rs.HelloWorld2";
 
 fn main() -> glib::ExitCode {
@@ -19,6 +20,9 @@ fn main() -> glib::ExitCode {
     app.connect_activate(build_ui);
     app.run()
 }
+
+static mut refreshRate:u64 = 1000;
+
 
 fn build_ui(app: &Application) {
     let scrolled_window = ScrolledWindow::new();
@@ -35,7 +39,6 @@ fn build_ui(app: &Application) {
     .build();
 
     static mut flag:i32=0;
-    static mut refreshRate:u64 = 1000;
 
     fn SleepingFlag()
     {
@@ -172,6 +175,36 @@ fn build_ui(app: &Application) {
     // .margin_end(700)
     .build();
 
+    let refreshRateField = gtk::Entry::builder()
+    .margin_start(500)
+    // .margin_end(500)
+    .width_request(100)
+    .build();
+
+    let setRefreshRate = gtk::Button::builder()
+    .label("Update refresh rate")
+    .build();
+
+    // let mut refresh_rate = RefCell::new(unsafe { refreshRate });
+    let mut rValue = unsafe{refreshRate};
+
+    fn updateRefreshRate(value:u64)
+    {
+        unsafe{refreshRate = value;};
+    }
+
+    setRefreshRate.connect_clicked(clone!(@weak refreshRateField => move |_|{
+        let rRfield = refreshRateField.clone();
+        let rR = rRfield.text().to_string();
+        let value = rR.parse::<u64>().unwrap();
+        updateRefreshRate(value);
+        // thread::park();
+        println!("{}",unsafe{refreshRate});
+        println!("doneee");
+        // timeout_add_local(unsafe{refreshRate}, func)
+        // thread::park_timeout(Duration::from_millis(200));
+    }));
+
     let searchButton = gtk::Button::builder()
     .label("Search")
     .build();
@@ -196,6 +229,8 @@ fn build_ui(app: &Application) {
     // settingsBox.append(&button);
     settingsBox.append(&running_filter);
     settingsBox.append(&Sleeping_filter);
+    settingsBox.append(&refreshRateField);
+    settingsBox.append(&setRefreshRate);
 
     let mainBox = gtk::Box::builder()
     .orientation(Orientation::Vertical)
@@ -326,10 +361,11 @@ fn build_ui(app: &Application) {
                         println!("Failed to fetch process data");
                     }
                 }
+                println!("from thread: {}",unsafe{refreshRate});
                 *handle = Some(thread::spawn(move || fetch_process_data(unsafe{flag})));
             }
             glib::Continue(true)
-        });
+    });
     // }));
 
     let window = ApplicationWindow::builder()

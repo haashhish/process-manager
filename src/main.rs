@@ -1,5 +1,5 @@
 use gtk4 as gtk;
-use gtk::{prelude::*, Orientation, ScrolledWindow, TreeStore, SearchEntry, ToggleButton};
+use gtk::{prelude::*, Orientation, ScrolledWindow, TreeStore, SearchEntry, ToggleButton, ScrollablePolicy};
 use gtk::{Application, ApplicationWindow, CellRendererText, TreeView, TreeViewColumn};
 use sysinfo::{ProcessExt, System, SystemExt, ProcessStatus};
 use std::thread::sleep;
@@ -13,12 +13,24 @@ use std::borrow::{Borrow, BorrowMut};
 use users::{get_current_uid, get_user_by_uid};
 use std::sync::mpsc;
 use std::cell::RefCell;
+use crate::{AdjustmentExt};
 const APP_ID: &str = "org.gtk_rs.HelloWorld2";
 
 fn main() -> glib::ExitCode {
     let app = Application::builder().application_id(APP_ID).build();
     app.connect_activate(build_ui);
     app.run()
+}
+
+struct proc
+{
+    procID : i32,
+    procName : String,
+    UID : i32,
+    parentID : i32,
+    memUsage : u64,
+    cpuUsage : f32,
+    user : String,
 }
 
 static mut refreshRate:u64 = 1000;
@@ -156,14 +168,18 @@ fn build_ui(app: &Application) {
     treeview.append_column(&uname_column);
 
     // treeStore that stores the data to be added later in the table
-    let mut store = gtk::TreeStore::new(&[String::static_type(),
+    let mut store = gtk::TreeStore::new(
+        &[i32::static_type(),
         String::static_type(),
+        i32::static_type(),
+        u64::static_type(),
+        f32::static_type(),
         String::static_type(),
-        String::static_type(),
-        String::static_type(),
-        String::static_type(),
-        String::static_type()]);
-
+        i32::static_type()]);
+    let v = scrolled_window.vadjustment();
+    let h = scrolled_window.hadjustment();
+    scrolled_window.set_vadjustment(Some(&v));
+    scrolled_window.set_hadjustment(Some(&h));
     scrolled_window.set_child(Some(&treeview));
     treeview.set_model(Some(&store));
 
@@ -251,24 +267,24 @@ fn build_ui(app: &Application) {
     ///
 
 
-    fn fillTable(store:TreeStore, all:Vec<Vec<String>>) -> TreeStore
+    fn fillTable(store:TreeStore, all:Vec<Vec<proc>>) -> TreeStore
     {
         store.clear();
         for row in &all 
         {
             let tree_iter = store.append(None);
-            store.set_value(&tree_iter, 0, &row[0].to_value());
-            store.set_value(&tree_iter, 1, &row[1].to_value());
-            store.set_value(&tree_iter, 2, &row[2].to_value());
-            store.set_value(&tree_iter, 3, &row[3].to_value());
-            store.set_value(&tree_iter, 4, &row[4].to_value());
-            store.set_value(&tree_iter, 5, &row[5].to_value());
-            store.set_value(&tree_iter, 6, &row[6].to_value());
+            store.set_value(&tree_iter, 0, &row[0].procID.to_value());
+            store.set_value(&tree_iter, 1, &row[0].procName.to_value());
+            store.set_value(&tree_iter, 2, &row[0].UID.to_value());
+            store.set_value(&tree_iter, 3, &row[0].memUsage.to_value());
+            store.set_value(&tree_iter, 4, &row[0].cpuUsage.to_value());
+            store.set_value(&tree_iter, 5, &row[0].user.to_value());
+            store.set_value(&tree_iter, 6, &row[0].parentID.to_value());
         }
         return store;
     }
 
-    fn fetch_process_data(f:i32) -> Vec<Vec<String>> {
+    fn fetch_process_data(f:i32) -> Vec<Vec<proc>> {
         let mut sys = System::new_all();
         sys.refresh_all();
         let mut data = vec![];
@@ -280,20 +296,28 @@ fn build_ui(app: &Application) {
                 if (process.status() == ProcessStatus::Run) 
                 {
                     let uName = users::get_user_by_uid(process.user_id().unwrap().to_string().parse().unwrap());
-                    let mut parentID:String = " ".to_string();
+                    let mut parentID:i32 = 0;
                     if(process.parent() != None)
                     {
                         // println!("{}",process.parent().unwrap().to_string());
-                        parentID = process.parent().unwrap().to_string();
+                        parentID = process.parent().unwrap().to_string().parse::<i32>().unwrap();
                     }
-                    let row = vec![pid.to_string(), 
-                    process.name().to_string(), 
-                    process.user_id().unwrap().to_string(), 
-                    process.memory().to_string(), 
-                    process.cpu_usage().to_string(),
-                    uName.unwrap().name().to_string_lossy().to_string(),
-                    parentID.to_string()];
-                    data.push(row);
+                    let mut allProcs : Vec<proc> = vec![];
+                    allProcs.push(proc { procID: (pid.to_string().parse::<i32>().unwrap()), 
+                        procName: (process.name().to_string()), 
+                        UID: (process.user_id().unwrap().to_string().parse::<i32>().unwrap()), 
+                        parentID: (parentID), 
+                        memUsage: (process.memory()), 
+                        cpuUsage: (process.cpu_usage()), 
+                        user: (uName.unwrap().name().to_string_lossy().to_string()) });
+                    // let row = vec![pid.to_string(), 
+                    // process.name().to_string(), 
+                    // process.user_id().unwrap().to_string(), 
+                    // process.memory().to_string(), 
+                    // process.cpu_usage().to_string(),
+                    // uName.unwrap().name().to_string_lossy().to_string(),
+                    // parentID.to_string()];
+                    data.push(allProcs);
                 }
             }
             else if (f==2)
@@ -301,39 +325,41 @@ fn build_ui(app: &Application) {
                 if (process.status() == ProcessStatus::Sleep) 
                 {
                     let uName = users::get_user_by_uid(process.user_id().unwrap().to_string().parse().unwrap());
-                    let mut parentID:String = " ".to_string();
+                    let mut parentID:i32 = 0;
                     if(process.parent() != None)
                     {
                         // println!("{}",process.parent().unwrap().to_string());
-                        parentID = process.parent().unwrap().to_string();
+                        parentID = process.parent().unwrap().to_string().parse::<i32>().unwrap();
                     }
-                    let row = vec![pid.to_string(), 
-                    process.name().to_string(), 
-                    process.user_id().unwrap().to_string(), 
-                    process.memory().to_string(), 
-                    process.cpu_usage().to_string(),
-                    uName.unwrap().name().to_string_lossy().to_string(),
-                    parentID.to_string()];
-                    data.push(row);
+                    let mut allProcs : Vec<proc> = vec![];
+                    allProcs.push(proc { procID: (pid.to_string().parse::<i32>().unwrap()), 
+                        procName: (process.name().to_string()), 
+                        UID: (process.user_id().unwrap().to_string().parse::<i32>().unwrap()), 
+                        parentID: (parentID), 
+                        memUsage: (process.memory()), 
+                        cpuUsage: (process.cpu_usage()), 
+                        user: (uName.unwrap().name().to_string_lossy().to_string()) });
+                    data.push(allProcs);
                 }
             }
             else 
             {
-                    let uName = users::get_user_by_uid(process.user_id().unwrap().to_string().parse().unwrap());
-                    let mut parentID:String = " ".to_string();
-                    if(process.parent() != None)
-                    {
-                        // println!("{}",process.parent().unwrap().to_string());
-                        parentID = process.parent().unwrap().to_string();
-                    }
-                    let row = vec![pid.to_string(), 
-                    process.name().to_string(), 
-                    process.user_id().unwrap().to_string(), 
-                    process.memory().to_string(), 
-                    process.cpu_usage().to_string(),
-                    uName.unwrap().name().to_string_lossy().to_string(),
-                    parentID.to_string()];
-                    data.push(row);
+                let uName = users::get_user_by_uid(process.user_id().unwrap().to_string().parse().unwrap());
+                let mut parentID:i32 = 0;
+                if(process.parent() != None)
+                {
+                    // println!("{}",process.parent().unwrap().to_string());
+                    parentID = process.parent().unwrap().to_string().parse::<i32>().unwrap();
+                }
+                let mut allProcs : Vec<proc> = vec![];
+                allProcs.push(proc { procID: (pid.to_string().parse::<i32>().unwrap()), 
+                    procName: (process.name().to_string()), 
+                    UID: (process.user_id().unwrap().to_string().parse::<i32>().unwrap()), 
+                    parentID: (parentID), 
+                    memUsage: (process.memory()), 
+                    cpuUsage: (process.cpu_usage()), 
+                    user: (uName.unwrap().name().to_string_lossy().to_string()) });
+                data.push(allProcs);
             }
         }
         return data;
@@ -347,6 +373,8 @@ fn build_ui(app: &Application) {
         let handle = Arc::new(Mutex::new(Some(thread::spawn(move || fetch_process_data(unsafe{flag})))));
         let handle_clone = handle.clone();
 
+        let v = scrolled_window.vadjustment();
+        let h = scrolled_window.hadjustment();
 
         glib::timeout_add_local(Duration::from_millis(unsafe{refreshRate}), move || {
             let mut handle = handle_clone.lock().unwrap();
@@ -356,6 +384,8 @@ fn build_ui(app: &Application) {
                         let mut temp = store.clone();
                         temp = fillTable(temp, result);
                         store = temp;
+                        scrolled_window.set_vadjustment(Some(&v));
+                        scrolled_window.set_hadjustment(Some(&h));
                     }
                     Err(_) => {
                         println!("Failed to fetch process data");

@@ -237,14 +237,54 @@ fn build_ui(app: &Application) {
     searchBox.append(&searchProcessField);
     searchBox.append(&searchButton);
 
+    let filterLabel = gtk::Label::builder()
+    .label("    Filter by:       ")
+    .build();
+
+    let customizeLabel = gtk::Label::builder()
+    .label("    Remove column:       ")
+    .build();
+
+    let nameCheckBox = gtk::CheckButton::builder()
+    .label("Name")
+    .build();
+
+    let parentCheckBox = gtk::CheckButton::builder()
+    .label("Parent ID")
+    .build();
+
+    nameCheckBox.connect_toggled(clone!(@weak nameCheckBox => move |_| {
+        if(nameCheckBox.is_active())
+        {
+            treeview.remove_column(&name_column);
+        }
+        else 
+        {
+            treeview.remove_column(&uid_column);
+            treeview.remove_column(&parent_column);
+            treeview.remove_column(&mem_column);
+            treeview.remove_column(&cpu_column);
+            treeview.remove_column(&uname_column);
+            treeview.append_column(&name_column);
+            treeview.append_column(&uid_column);
+            treeview.append_column(&parent_column);
+            treeview.append_column(&mem_column);
+            treeview.append_column(&cpu_column);
+            treeview.append_column(&uname_column);
+        }
+    }));
+
 
     let settingsBox = gtk::Box::builder()
     .orientation(Orientation::Horizontal)
     .build();
 
     // settingsBox.append(&button);
+    settingsBox.append(&filterLabel);
     settingsBox.append(&running_filter);
     settingsBox.append(&Sleeping_filter);
+    settingsBox.append(&customizeLabel);
+    settingsBox.append(&nameCheckBox);
     settingsBox.append(&refreshRateField);
     settingsBox.append(&setRefreshRate);
 

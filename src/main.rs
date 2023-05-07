@@ -26,7 +26,7 @@ fn main() -> glib::ExitCode {
 
 
 #[derive(Clone)]
-struct proc
+struct proc //struct to store all data of each process
 {
     procID : i32,
     procName : String,
@@ -35,9 +35,10 @@ struct proc
     memUsage : u64,
     cpuUsage : f64,
     user : String,
+    diskUsage:u64
 }
 
-static mut refreshRate:u64 = 4000;
+static mut refreshRate:u64 = 0;
 
 
 fn build_ui(app: &Application) {
@@ -54,7 +55,7 @@ fn build_ui(app: &Application) {
     .label("Sleeping Processes")
     .build();
 
-    static mut flag:i32=0;
+    static mut flag:i32=0; //flag that represents filter option, 1: running processes, 2: sleeping processes
 
     fn SleepingFlag()
     {
@@ -78,9 +79,6 @@ fn build_ui(app: &Application) {
         {
             unsafe{flag=1;}
         }
-        // println!("{}",unsafe {
-        //     flag
-        // });
     }
 
      running_filter.connect_clicked(move |_| {
@@ -91,21 +89,13 @@ fn build_ui(app: &Application) {
         unsafe{SleepingFlag();}
     });
 
-    let mut button2 = gtk::Button::builder()
-        .label("Search")
-        .build();
-
-    let mut button = gtk::Button::builder()
-        .label("Refresh processes")
-        .build();
-
     let treeview = TreeView::new();
     treeview.set_activate_on_single_click(true);
     let clone1:TreeView = treeview.clone();
     let clone2:TreeView = treeview.clone();
     let clone3:TreeView = treeview.clone();
 
-
+    //set of columns to populate the table of processes
    // create column 1
    let id_column = TreeViewColumn::new();
    id_column.set_title("Process ID");
@@ -165,8 +155,6 @@ fn build_ui(app: &Application) {
    let uname_clone2:TreeViewColumn = uname_column.clone();
    let uname_clone3:TreeViewColumn = uname_column.clone();
 
-
-
    //column 7
    let parent_column = TreeViewColumn::new();
    parent_column.set_title("Parent ID");
@@ -175,6 +163,15 @@ fn build_ui(app: &Application) {
    parent_column.add_attribute(&parent_cell, "text", 6);
    parent_column.set_sort_column_id(6);
    let parentClone:TreeViewColumn = parent_column.clone();
+
+   //column 8
+   let disk_column = TreeViewColumn::new();
+   disk_column.set_title("Disk I/O (Bytes)");
+   let disk_cell = CellRendererText::new();
+   disk_column.pack_start(&disk_cell, true);
+   disk_column.add_attribute(&disk_cell, "text", 7);
+   disk_column.set_sort_column_id(7);
+   let diskClone:TreeViewColumn = disk_column.clone();
    
 
     // append columns to the table
@@ -182,6 +179,7 @@ fn build_ui(app: &Application) {
     treeview.append_column(&name_column);
     treeview.append_column(&uid_column);
     treeview.append_column(&parent_column);
+    treeview.append_column(&disk_column);
     treeview.append_column(&mem_column);
     treeview.append_column(&cpu_column);
     treeview.append_column(&uname_column);
@@ -194,7 +192,8 @@ fn build_ui(app: &Application) {
         u64::static_type(),
         f32::static_type(),
         String::static_type(),
-        i32::static_type()]);
+        i32::static_type(),
+        u64::static_type()]);
     let v = scrolled_window.vadjustment();
     let h = scrolled_window.hadjustment();
     scrolled_window.set_vadjustment(Some(&v));
@@ -203,11 +202,8 @@ fn build_ui(app: &Application) {
     treeview.set_model(Some(&store));
 
     //search bar
-    //let search_entry = SearchEntry::new();
     scrolled_window.set_child(Some(&treeview));
-    // scrolled_window.set_margin_bottom(0);
     let searchProcessField = gtk::SearchEntry::builder()
-    // .margin_end(700)
     .build();
 
     let killLabel = gtk::Label::builder()
@@ -230,8 +226,6 @@ fn build_ui(app: &Application) {
     let killResult_clone = killResult.clone();
 
     let refreshRateField = gtk::Entry::builder()
-    // .margin_start(500)
-    // .margin_end(500)
     .width_request(100)
     .build();
 
@@ -258,9 +252,6 @@ fn build_ui(app: &Application) {
     .orientation(Orientation::Horizontal)
     .build();
 
-    // let mut refresh_rate = RefCell::new(unsafe { refreshRate });
-    let mut rValue = unsafe{refreshRate};
-
     fn updateRefreshRate(value:u64)
     {
         unsafe{refreshRate = value;};
@@ -271,11 +262,6 @@ fn build_ui(app: &Application) {
         let rR = rRfield.text().to_string();
         let value = rR.parse::<u64>().unwrap();
         updateRefreshRate(value);
-        // thread::park();
-        println!("{}",unsafe{refreshRate});
-        println!("doneee");
-        // timeout_add_local(unsafe{refreshRate}, func)
-        // thread::park_timeout(Duration::from_millis(200));
     }));
 
     searchButton.connect_clicked(move |_|{
@@ -290,10 +276,7 @@ fn build_ui(app: &Application) {
         {
             isFound = true;
             let stringP1 : String = "Process Info:\n".to_owned();
-            // let stringP2 : String = " CPU Usage: ".to_owned();
-            // let stringP3 : String = " User: ".to_owned();
             let pName : &str = i[0].procName.as_str();
-            // let cpuUsage : &str = i[0].cpuUsage.to_string().as_str();
             let userName : &str = i[0].user.as_str();
             let finalR = stringP1.clone() +"Process name: "+ pName+ ", User: " + userName;
             finalRes.set_text(&finalR);
@@ -335,8 +318,8 @@ fn build_ui(app: &Application) {
         }
     });
 
+    //box used to hold all widgets used to search for a specific process
     searchBox.append(&searchByLabel);
-    // searchBox.append(&choice);
     searchBox.append(&searchProcessField);
     searchBox.append(&searchButton);
     searchBox.append(&searchResult);
@@ -381,12 +364,14 @@ fn build_ui(app: &Application) {
         {
             treeview.remove_column(&uid_column);
             treeview.remove_column(&parent_column);
+            treeview.remove_column(&disk_column);
             treeview.remove_column(&mem_column);
             treeview.remove_column(&cpu_column);
             treeview.remove_column(&uname_column);
             treeview.append_column(&name_column);
             treeview.append_column(&uid_column);
             treeview.append_column(&parent_column);
+            treeview.append_column(&disk_column);
             treeview.append_column(&mem_column);
             treeview.append_column(&cpu_column);
             treeview.append_column(&uname_column);
@@ -400,10 +385,12 @@ fn build_ui(app: &Application) {
         }
         else 
         {
+            clone1.remove_column(&diskClone);
             clone1.remove_column(&mem_clone);
             clone1.remove_column(&cpu_clone);
             clone1.remove_column(&uname_clone);
             clone1.append_column(&parentClone);
+            clone1.append_column(&diskClone);
             clone1.append_column(&mem_clone);
             clone1.append_column(&cpu_clone);
             clone1.append_column(&uname_clone);
@@ -443,7 +430,7 @@ fn build_ui(app: &Application) {
     .orientation(Orientation::Horizontal)
     .build();
 
-    // settingsBox.append(&button);
+    //the box that has all settings within the app
     settingsBox.append(&filterLabel);
     settingsBox.append(&running_filter);
     settingsBox.append(&Sleeping_filter);
@@ -455,24 +442,13 @@ fn build_ui(app: &Application) {
     settingsBox.append(&refreshRateField);
     settingsBox.append(&setRefreshRate);
 
+    //main box that is holding scrolled window, settings box, and search box
     let mainBox = gtk::Box::builder()
     .orientation(Orientation::Vertical)
     .build();
     mainBox.append(&settingsBox);
     mainBox.append(&scrolled_window);
     mainBox.append(&searchBox);
-    // mainBox.append(&textEntry);
-    // mainBox.append(&button);
-    // mainBox.append(&button2);
-    // grid.attach(&scrolled_window, 0, 0, 1, 1);
-    // grid.attach(&textEntry, 1, 1, 0, 0);
-    // grid.attach(&button, 0, 1, 1, 1);
-    // button.activate();
-
-    /////////////////////////
-    /// 
-    ///
-    /// 
 
 
     fn fillTable(store:TreeStore, all:Vec<Vec<proc>>) -> TreeStore
@@ -488,18 +464,16 @@ fn build_ui(app: &Application) {
             store.set_value(&tree_iter, 4, &row[0].cpuUsage.to_value());
             store.set_value(&tree_iter, 5, &row[0].user.to_value());
             store.set_value(&tree_iter, 6, &row[0].parentID.to_value());
+            store.set_value(&tree_iter, 7, &row[0].diskUsage.to_value());
         }
-        // editTable(&treeview);
         return store;
     }
 
+    //used to fetch data with a specific flag and returns a vector<vector<proc>> which has all processes
     fn fetch_process_data(f:i32) -> Vec<Vec<proc>> {
         let mut sys = System::new_all();
         sys.refresh_all();
-        // sys.refresh_cpu();
         let mut data = vec![];
-        // println!("{}",f);
-        // let num_cpus = num_cpus::get() as f32;
         for (pid, process) in sys.processes() {
             if (f==1)
             {
@@ -516,8 +490,6 @@ fn build_ui(app: &Application) {
                     let elapsed_sec = sys.uptime() as f64 - starttime_sec;
                     let usage_sec = utime_sec + stime_sec;
                     let cpu_usage1 = 100.0 * usage_sec / elapsed_sec;
-                    //println!("{}",cpu_usage1);
-                    // println!("{}",p.pid);
                     if (p.pid == pid.to_string().parse::<i32>().unwrap())
                     {
                         t = cpu_usage1;
@@ -527,24 +499,20 @@ fn build_ui(app: &Application) {
                     let mut parentID:i32 = 0;
                     if(process.parent() != None)
                     {
-                        // println!("{}",process.parent().unwrap().to_string());
                         parentID = process.parent().unwrap().to_string().parse::<i32>().unwrap();
                     }
                     let mut allProcs : Vec<proc> = vec![];
+                    let diskR = process.disk_usage().total_read_bytes;
+                    let diskW = process.disk_usage().total_written_bytes;
+                    let totalIO = diskR+diskW;
                     allProcs.push(proc { procID: (pid.to_string().parse::<i32>().unwrap()), 
                         procName: (process.name().to_string()), 
                         UID: (process.user_id().unwrap().to_string().parse::<i32>().unwrap()), 
                         parentID: (parentID), 
                         memUsage: (process.memory()), 
                         cpuUsage: (t), 
-                        user: (uName.unwrap().name().to_string_lossy().to_string()) });
-                    // let row = vec![pid.to_string(), 
-                    // process.name().to_string(), 
-                    // process.user_id().unwrap().to_string(), 
-                    // process.memory().to_string(), 
-                    // process.cpu_usage().to_string(),
-                    // uName.unwrap().name().to_string_lossy().to_string(),
-                    // parentID.to_string()];
+                        user: (uName.unwrap().name().to_string_lossy().to_string()),
+                    diskUsage: totalIO.to_string().parse::<u64>().unwrap()});
                     data.push(allProcs);
                 }
             }
@@ -563,8 +531,6 @@ fn build_ui(app: &Application) {
                     let elapsed_sec = sys.uptime() as f64 - starttime_sec;
                     let usage_sec = utime_sec + stime_sec;
                     let cpu_usage1 = 100.0 * usage_sec / elapsed_sec;
-                    //println!("{}",cpu_usage1);
-                    // println!("{}",p.pid);
                     if (p.pid == pid.to_string().parse::<i32>().unwrap())
                     {
                         t = cpu_usage1;
@@ -574,18 +540,20 @@ fn build_ui(app: &Application) {
                     let mut parentID:i32 = 0;
                     if(process.parent() != None)
                     {
-                        // println!("{}",process.parent().unwrap().to_string());
                         parentID = process.parent().unwrap().to_string().parse::<i32>().unwrap();
                     }
                     let mut allProcs : Vec<proc> = vec![];
+                    let diskR = process.disk_usage().total_read_bytes;
+                    let diskW = process.disk_usage().total_written_bytes;
+                    let totalIO = diskR+diskW;
                     allProcs.push(proc { procID: (pid.to_string().parse::<i32>().unwrap()), 
                         procName: (process.name().to_string()), 
                         UID: (process.user_id().unwrap().to_string().parse::<i32>().unwrap()), 
                         parentID: (parentID), 
                         memUsage: (process.memory()), 
                         cpuUsage: (t), 
-                        user: (uName.unwrap().name().to_string_lossy().to_string()) });
-                    data.push(allProcs);
+                        user: (uName.unwrap().name().to_string_lossy().to_string()),
+                    diskUsage: totalIO.to_string().parse::<u64>().unwrap()});
                 }
             }
             else 
@@ -601,8 +569,6 @@ fn build_ui(app: &Application) {
                     let elapsed_sec = sys.uptime() as f64 - starttime_sec;
                     let usage_sec = utime_sec + stime_sec;
                     let cpu_usage1 = 100.0 * usage_sec / elapsed_sec;
-                    //println!("{}",cpu_usage1);
-                    // println!("{}",p.pid);
                     if (p.pid == pid.to_string().parse::<i32>().unwrap())
                     {
                         t = cpu_usage1;
@@ -612,30 +578,28 @@ fn build_ui(app: &Application) {
                 let mut parentID:i32 = 0;
                 if(process.parent() != None)
                 {
-                    // println!("{}",process.parent().unwrap().to_string());
                     parentID = process.parent().unwrap().to_string().parse::<i32>().unwrap();
                 }
-                let runtime = process.run_time();
-                // println!("{}",runtime);
                 let mut allProcs : Vec<proc> = vec![];
+                let diskR = process.disk_usage().total_read_bytes;
+                let diskW = process.disk_usage().total_written_bytes;
+                let totalIO = diskR+diskW;
                 allProcs.push(proc { procID: (pid.to_string().parse::<i32>().unwrap()), 
                     procName: (process.name().to_string()), 
                     UID: (process.user_id().unwrap().to_string().parse::<i32>().unwrap()), 
                     parentID: (parentID), 
                     memUsage: (process.memory()), 
                     cpuUsage: (t), 
-                    user: (uName.unwrap().name().to_string_lossy().to_string()) });
+                    user: (uName.unwrap().name().to_string_lossy().to_string()),
+                diskUsage: totalIO.to_string().parse::<u64>().unwrap()});
                 data.push(allProcs);
             }
         }
         return data;
     }
 
-    //to change refresh rate
     // Spawn a new thread to fetch the process data and update the UI when it's available
-    // button.connect_clicked(clone!(@weak store, @weak treeview => move |_| {
         let mut store = store.clone();
-        // let treeview = treeview.clone();
         let handle = Arc::new(Mutex::new(Some(thread::spawn(move || fetch_process_data(unsafe{flag})))));
         let handle_clone = handle.clone();
 
@@ -647,7 +611,9 @@ fn build_ui(app: &Application) {
         {
             unsafe{allData = res};
         }
+        let mut interval = 2500 + unsafe{refreshRate};
 
+        //main thread that keeps updating the whole program
         glib::timeout_add_local(Duration::from_millis(1000+unsafe{refreshRate}),move || {
             let mut handle = handle_clone.lock().unwrap();
             if let Some(handle_inner) = handle.take() {
@@ -665,13 +631,12 @@ fn build_ui(app: &Application) {
                         println!("Failed to fetch process data");
                     }
                 }
-                // println!("from thread: {}",unsafe{refreshRate});
                 *handle = Some(thread::spawn(move || fetch_process_data(unsafe{flag})));
             }
             glib::Continue(true)
     });
-    // }));
 
+    //window information
     let window = ApplicationWindow::builder()
         .application(app)
         .title("Process Manager")

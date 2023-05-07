@@ -33,7 +33,7 @@ struct proc
     user : String,
 }
 
-static mut refreshRate:u64 = 1000;
+static mut refreshRate:u64 = 5000;
 
 
 fn build_ui(app: &Application) {
@@ -100,6 +100,10 @@ fn build_ui(app: &Application) {
 
     let treeview = TreeView::new();
     treeview.set_activate_on_single_click(true);
+    let clone1:TreeView = treeview.clone();
+    let clone2:TreeView = treeview.clone();
+    let clone3:TreeView = treeview.clone();
+
 
    // create column 1
    let id_column = TreeViewColumn::new();
@@ -133,6 +137,8 @@ fn build_ui(app: &Application) {
    mem_column.pack_start(&mem_cell, true);
    mem_column.add_attribute(&mem_cell, "text", 3);
    mem_column.set_sort_column_id(3);
+   let mem_clone:TreeViewColumn = mem_column.clone();
+   let mem_clone2:TreeViewColumn = mem_column.clone();
 
    //column 5
    let cpu_column = TreeViewColumn::new();
@@ -141,6 +147,11 @@ fn build_ui(app: &Application) {
    cpu_column.pack_start(&cpu_cell, true);
    cpu_column.add_attribute(&cpu_cell, "text", 4);
    cpu_column.set_sort_column_id(4);
+   let cpu_clone : TreeViewColumn = cpu_column.clone();
+   let cpu_clone2 : TreeViewColumn = cpu_column.clone();
+   let cpu_clone3 : TreeViewColumn = cpu_column.clone();
+
+
 
    //column 6
    let uname_column = TreeViewColumn::new();
@@ -149,6 +160,11 @@ fn build_ui(app: &Application) {
    uname_column.pack_start(&uname_cell, true);
    uname_column.add_attribute(&uname_cell, "text", 5);
    uname_column.set_sort_column_id(5);
+   let uname_clone:TreeViewColumn = uname_column.clone();
+   let uname_clone2:TreeViewColumn = uname_column.clone();
+   let uname_clone3:TreeViewColumn = uname_column.clone();
+
+
 
    //column 7
    let parent_column = TreeViewColumn::new();
@@ -157,6 +173,8 @@ fn build_ui(app: &Application) {
    parent_column.pack_start(&parent_cell, true);
    parent_column.add_attribute(&parent_cell, "text", 6);
    parent_column.set_sort_column_id(6);
+   let parentClone:TreeViewColumn = parent_column.clone();
+   
 
     // append columns to the table
     treeview.append_column(&id_column);
@@ -192,7 +210,7 @@ fn build_ui(app: &Application) {
     .build();
 
     let refreshRateField = gtk::Entry::builder()
-    .margin_start(500)
+    // .margin_start(500)
     // .margin_end(500)
     .width_request(100)
     .build();
@@ -238,11 +256,11 @@ fn build_ui(app: &Application) {
     searchBox.append(&searchButton);
 
     let filterLabel = gtk::Label::builder()
-    .label("    Filter by:       ")
+    .label("  Filter by:    ")
     .build();
 
     let customizeLabel = gtk::Label::builder()
-    .label("    Remove column:       ")
+    .label("    Remove column:  ")
     .build();
 
     let nameCheckBox = gtk::CheckButton::builder()
@@ -253,10 +271,21 @@ fn build_ui(app: &Application) {
     .label("Parent ID")
     .build();
 
+    let memCheckBox = gtk::CheckButton::builder()
+    .label("Memory usage")
+    .build();
+
+    let cpuCheckBox = gtk::CheckButton::builder()
+    .label("CPU usage")
+    .build();
+
+    static mut removeNameCol : bool = false;
+
     nameCheckBox.connect_toggled(clone!(@weak nameCheckBox => move |_| {
         if(nameCheckBox.is_active())
         {
             treeview.remove_column(&name_column);
+            unsafe{removeNameCol = true};
         }
         else 
         {
@@ -274,6 +303,51 @@ fn build_ui(app: &Application) {
         }
     }));
 
+    parentCheckBox.connect_toggled(clone!(@weak parentCheckBox => move |_| {
+        if(parentCheckBox.is_active())
+        {
+            clone1.remove_column(&parentClone);
+        }
+        else 
+        {
+            clone1.remove_column(&mem_clone);
+            clone1.remove_column(&cpu_clone);
+            clone1.remove_column(&uname_clone);
+            clone1.append_column(&parentClone);
+            clone1.append_column(&mem_clone);
+            clone1.append_column(&cpu_clone);
+            clone1.append_column(&uname_clone);
+        }
+    }));
+
+    memCheckBox.connect_toggled(clone!(@weak memCheckBox => move |_| {
+        if(memCheckBox.is_active())
+        {
+            clone2.remove_column(&mem_clone2);
+        }
+        else 
+        {
+            clone2.remove_column(&cpu_clone2);
+            clone2.remove_column(&uname_clone2);
+            clone2.append_column(&mem_clone2);
+            clone2.append_column(&cpu_clone2);
+            clone2.append_column(&uname_clone2);
+        }
+    }));
+
+    cpuCheckBox.connect_toggled(clone!(@weak cpuCheckBox => move |_| {
+        if(cpuCheckBox.is_active())
+        {
+            clone3.remove_column(&cpu_clone3);
+        }
+        else 
+        {
+            clone3.remove_column(&uname_clone3);
+            clone3.append_column(&cpu_clone3);
+            clone3.append_column(&uname_clone3);
+        }
+    }));
+
 
     let settingsBox = gtk::Box::builder()
     .orientation(Orientation::Horizontal)
@@ -285,6 +359,9 @@ fn build_ui(app: &Application) {
     settingsBox.append(&Sleeping_filter);
     settingsBox.append(&customizeLabel);
     settingsBox.append(&nameCheckBox);
+    settingsBox.append(&parentCheckBox);
+    settingsBox.append(&memCheckBox);
+    settingsBox.append(&cpuCheckBox);
     settingsBox.append(&refreshRateField);
     settingsBox.append(&setRefreshRate);
 
@@ -305,6 +382,7 @@ fn build_ui(app: &Application) {
     /////////////////////////
     /// 
     ///
+    /// 
 
 
     fn fillTable(store:TreeStore, all:Vec<Vec<proc>>) -> TreeStore
@@ -321,6 +399,7 @@ fn build_ui(app: &Application) {
             store.set_value(&tree_iter, 5, &row[0].user.to_value());
             store.set_value(&tree_iter, 6, &row[0].parentID.to_value());
         }
+        // editTable(&treeview);
         return store;
     }
 
@@ -416,7 +495,7 @@ fn build_ui(app: &Application) {
         let v = scrolled_window.vadjustment();
         let h = scrolled_window.hadjustment();
 
-        glib::timeout_add_local(Duration::from_millis(unsafe{refreshRate}), move || {
+        glib::timeout_add_local(Duration::from_millis(unsafe{refreshRate}),move || {
             let mut handle = handle_clone.lock().unwrap();
             if let Some(handle_inner) = handle.take() {
                 match handle_inner.join() {
@@ -431,7 +510,7 @@ fn build_ui(app: &Application) {
                         println!("Failed to fetch process data");
                     }
                 }
-                println!("from thread: {}",unsafe{refreshRate});
+                // println!("from thread: {}",unsafe{refreshRate});
                 *handle = Some(thread::spawn(move || fetch_process_data(unsafe{flag})));
             }
             glib::Continue(true)

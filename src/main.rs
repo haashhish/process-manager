@@ -1,3 +1,4 @@
+use gio::ffi::GListModel;
 use gtk4 as gtk;
 use gtk::{prelude::*, Orientation, ScrolledWindow, TreeStore, SearchEntry, ToggleButton, ScrollablePolicy};
 use gtk::{Application, ApplicationWindow, CellRendererText, TreeView, TreeViewColumn};
@@ -22,6 +23,8 @@ fn main() -> glib::ExitCode {
     app.run()
 }
 
+
+#[derive(Clone)]
 struct proc
 {
     procID : i32,
@@ -33,7 +36,7 @@ struct proc
     user : String,
 }
 
-static mut refreshRate:u64 = 5000;
+static mut refreshRate:u64 = 4000;
 
 
 fn build_ui(app: &Application) {
@@ -242,18 +245,62 @@ fn build_ui(app: &Application) {
     let searchButton = gtk::Button::builder()
     .label("Search")
     .build();
+    let searchField = searchProcessField.clone();
+    
+    let searchResult = gtk::Label::builder()
+    .visible(false)
+    .build();
 
-    searchButton.connect_clicked(clone!(@weak store => move |_|{
-        // let tree_iter = store.append(None);
-        // let allData : Vec<Vec<String>> = fetch_process_data(f)
-    }));
+    let searchRes_clone = searchResult.clone();
+
+    searchButton.connect_clicked(move |_|{
+      let temp = unsafe {allData.to_vec()};
+      let textField = searchField.clone();
+      let text = textField.text().to_string();
+      let finalRes = searchRes_clone.clone();
+      let mut isFound:bool = false;
+      for i in temp
+      {
+        if(i[0].procID == text.parse::<i32>().unwrap())
+        {
+            isFound = true;
+            let stringP1 : String = "Process Info:\n".to_owned();
+            // let stringP2 : String = " CPU Usage: ".to_owned();
+            // let stringP3 : String = " User: ".to_owned();
+            let pName : &str = i[0].procName.as_str();
+            // let cpuUsage : &str = i[0].cpuUsage.to_string().as_str();
+            let userName : &str = i[0].user.as_str();
+            let finalR = stringP1.clone() +"Process name: "+ pName+ ", User: " + userName;
+            finalRes.set_text(&finalR);
+            finalRes.set_visible(true);
+        }
+      }
+      if(!isFound)
+      {
+        finalRes.set_text("No process was found");
+        finalRes.set_visible(true);
+      }
+    });
+
+    let searchByLabel = gtk::Label::builder()
+    .label("Search by PID:")
+    .build();
+
+
+    // let choice = gtk::DropDown::builder()
+    // .build();
 
     //let grid = gtk::Grid::new();
     let searchBox = gtk::Box::builder()
     .orientation(Orientation::Horizontal)
     .build();
+    
+
+    searchBox.append(&searchByLabel);
+    // searchBox.append(&choice);
     searchBox.append(&searchProcessField);
     searchBox.append(&searchButton);
+    searchBox.append(&searchResult);
 
     let filterLabel = gtk::Label::builder()
     .label("  Filter by:    ")
@@ -494,17 +541,25 @@ fn build_ui(app: &Application) {
 
         let v = scrolled_window.vadjustment();
         let h = scrolled_window.hadjustment();
+        static mut allData:Vec<Vec<proc>> = vec![];
 
-        glib::timeout_add_local(Duration::from_millis(unsafe{refreshRate}),move || {
+        fn updateDataToSearch(res:Vec<Vec<proc>>)
+        {
+            unsafe{allData = res};
+        }
+
+        glib::timeout_add_local(Duration::from_millis(1000+unsafe{refreshRate}),move || {
             let mut handle = handle_clone.lock().unwrap();
             if let Some(handle_inner) = handle.take() {
                 match handle_inner.join() {
                     Ok(result) => {
                         let mut temp = store.clone();
+                        let res_clone:Vec<Vec<proc>> = result.to_vec();
                         temp = fillTable(temp, result);
                         store = temp;
                         scrolled_window.set_vadjustment(Some(&v));
                         scrolled_window.set_hadjustment(Some(&h));
+                        updateDataToSearch(res_clone);
                     }
                     Err(_) => {
                         println!("Failed to fetch process data");
@@ -519,9 +574,10 @@ fn build_ui(app: &Application) {
 
     let window = ApplicationWindow::builder()
         .application(app)
-        .title("PCM")
+        .title("Process Manager")
         .default_width(900)
         .default_height(900)
+        .resizable(true)
         .child(&mainBox)
         .build();
 

@@ -7,10 +7,11 @@ edition = "2021"
 
 [dependencies]
 syscalls = "0.6.9"
-# sysinfo = "0.28.4"
-sysinfo = "0.29.0"
+sysinfo = "0.28.4"
+procfs = "0.15.1"
 gtk4 = "0.6.4"
 glib = "0.17.5"
 gio = "0.17.4"
 users = "0.11.0"
 num_cpus = "1.15.0"
+uptime_lib = "0.2.2"

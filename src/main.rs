@@ -2,7 +2,7 @@ use gio::ffi::GListModel;
 use gtk4 as gtk;
 use gtk::{prelude::*, Orientation, ScrolledWindow, TreeStore, SearchEntry, ToggleButton, ScrollablePolicy};
 use gtk::{Application, ApplicationWindow, CellRendererText, TreeView, TreeViewColumn};
-use sysinfo::{ProcessExt, System, SystemExt, ProcessStatus};
+use sysinfo::{ProcessExt, System, SystemExt, ProcessStatus, CpuExt, ProcessRefreshKind, Pid};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use glib::source::timeout_add_local;
@@ -15,6 +15,7 @@ use users::{get_current_uid, get_user_by_uid};
 use std::sync::mpsc;
 use std::cell::RefCell;
 use crate::{AdjustmentExt};
+extern crate uptime_lib;
 const APP_ID: &str = "org.gtk_rs.HelloWorld2";
 
 fn main() -> glib::ExitCode {
@@ -32,7 +33,7 @@ struct proc
     UID : i32,
     parentID : i32,
     memUsage : u64,
-    cpuUsage : f32,
+    cpuUsage : f64,
     user : String,
 }
 
@@ -65,9 +66,6 @@ fn build_ui(app: &Application) {
         {
             unsafe{flag=2;}
         }
-        // println!("{}",unsafe {
-        //     flag
-        // });
     }
 
     fn RunningFlag()
@@ -212,14 +210,46 @@ fn build_ui(app: &Application) {
     // .margin_end(700)
     .build();
 
+    let killLabel = gtk::Label::builder()
+    .label("Enter process PID:")
+    .build();
+    
+    let killField = gtk::Entry::builder()
+    .build();
+
+    let killField_clone = killField.clone();
+
+    let killButton = gtk::Button::builder()
+    .label("Kill process")
+    .build();
+
     let refreshRateField = gtk::Entry::builder()
     // .margin_start(500)
     // .margin_end(500)
     .width_request(100)
     .build();
 
+    let searchButton = gtk::Button::builder()
+    .label("Search")
+    .build();
+    let searchField = searchProcessField.clone();
+    
+    let searchResult = gtk::Label::builder()
+    .visible(false)
+    .build();
+
+    let searchRes_clone = searchResult.clone();
+
     let setRefreshRate = gtk::Button::builder()
     .label("Update refresh rate")
+    .build();
+
+    let searchByLabel = gtk::Label::builder()
+    .label("Search by PID:")
+    .build();
+
+    let searchBox = gtk::Box::builder()
+    .orientation(Orientation::Horizontal)
     .build();
 
     // let mut refresh_rate = RefCell::new(unsafe { refreshRate });
@@ -241,17 +271,6 @@ fn build_ui(app: &Application) {
         // timeout_add_local(unsafe{refreshRate}, func)
         // thread::park_timeout(Duration::from_millis(200));
     }));
-
-    let searchButton = gtk::Button::builder()
-    .label("Search")
-    .build();
-    let searchField = searchProcessField.clone();
-    
-    let searchResult = gtk::Label::builder()
-    .visible(false)
-    .build();
-
-    let searchRes_clone = searchResult.clone();
 
     searchButton.connect_clicked(move |_|{
       let temp = unsafe {allData.to_vec()};
@@ -282,25 +301,31 @@ fn build_ui(app: &Application) {
       }
     });
 
-    let searchByLabel = gtk::Label::builder()
-    .label("Search by PID:")
-    .build();
-
-
-    // let choice = gtk::DropDown::builder()
-    // .build();
-
-    //let grid = gtk::Grid::new();
-    let searchBox = gtk::Box::builder()
-    .orientation(Orientation::Horizontal)
-    .build();
-    
+    killButton.connect_clicked(move |_|{
+        let data = unsafe{allData.to_vec()};
+        let mut sys = System::new();
+        sys.refresh_all();
+        let enteredPID : i32 = killField_clone.text().to_string().parse::<i32>().unwrap();
+        for i in data
+        {
+            if(i[0].procID == enteredPID) ////////////////continue killingggg
+            {
+                // let t:usize = enteredPID;
+                // if let Some(process) = sys.process(Pid::from(1)) {
+                //     process.kill();
+                // }
+            }
+        }
+    });
 
     searchBox.append(&searchByLabel);
     // searchBox.append(&choice);
     searchBox.append(&searchProcessField);
     searchBox.append(&searchButton);
     searchBox.append(&searchResult);
+    searchBox.append(&killLabel);
+    searchBox.append(&killField);
+    searchBox.append(&killButton);
 
     let filterLabel = gtk::Label::builder()
     .label("  Filter by:    ")
@@ -453,6 +478,7 @@ fn build_ui(app: &Application) {
     fn fetch_process_data(f:i32) -> Vec<Vec<proc>> {
         let mut sys = System::new_all();
         sys.refresh_all();
+        // sys.refresh_cpu();
         let mut data = vec![];
         // println!("{}",f);
         // let num_cpus = num_cpus::get() as f32;
@@ -461,6 +487,24 @@ fn build_ui(app: &Application) {
             {
                 if (process.status() == ProcessStatus::Run) 
                 {
+                    let mut t:f64 = 0.;
+                for prc in procfs::process::all_processes().unwrap() {
+                    let p = prc.unwrap();
+                    let stat = p.stat().unwrap();
+                    let clk_tck : f64 = 100.;
+                    let utime_sec = stat.utime as f64 / clk_tck;
+                    let stime_sec = stat.stime as f64 / clk_tck;
+                    let starttime_sec = stat.starttime as f64 / clk_tck;
+                    let elapsed_sec = sys.uptime() as f64 - starttime_sec;
+                    let usage_sec = utime_sec + stime_sec;
+                    let cpu_usage1 = 100.0 * usage_sec / elapsed_sec;
+                    //println!("{}",cpu_usage1);
+                    // println!("{}",p.pid);
+                    if (p.pid == pid.to_string().parse::<i32>().unwrap())
+                    {
+                        t = cpu_usage1;
+                    }
+                }
                     let uName = users::get_user_by_uid(process.user_id().unwrap().to_string().parse().unwrap());
                     let mut parentID:i32 = 0;
                     if(process.parent() != None)
@@ -474,7 +518,7 @@ fn build_ui(app: &Application) {
                         UID: (process.user_id().unwrap().to_string().parse::<i32>().unwrap()), 
                         parentID: (parentID), 
                         memUsage: (process.memory()), 
-                        cpuUsage: (process.cpu_usage()), 
+                        cpuUsage: (t), 
                         user: (uName.unwrap().name().to_string_lossy().to_string()) });
                     // let row = vec![pid.to_string(), 
                     // process.name().to_string(), 
@@ -490,6 +534,24 @@ fn build_ui(app: &Application) {
             {
                 if (process.status() == ProcessStatus::Sleep) 
                 {
+                    let mut t:f64 = 0.;
+                for prc in procfs::process::all_processes().unwrap() {
+                    let p = prc.unwrap();
+                    let stat = p.stat().unwrap();
+                    let clk_tck : f64 = 100.;
+                    let utime_sec = stat.utime as f64 / clk_tck;
+                    let stime_sec = stat.stime as f64 / clk_tck;
+                    let starttime_sec = stat.starttime as f64 / clk_tck;
+                    let elapsed_sec = sys.uptime() as f64 - starttime_sec;
+                    let usage_sec = utime_sec + stime_sec;
+                    let cpu_usage1 = 100.0 * usage_sec / elapsed_sec;
+                    //println!("{}",cpu_usage1);
+                    // println!("{}",p.pid);
+                    if (p.pid == pid.to_string().parse::<i32>().unwrap())
+                    {
+                        t = cpu_usage1;
+                    }
+                }
                     let uName = users::get_user_by_uid(process.user_id().unwrap().to_string().parse().unwrap());
                     let mut parentID:i32 = 0;
                     if(process.parent() != None)
@@ -503,13 +565,31 @@ fn build_ui(app: &Application) {
                         UID: (process.user_id().unwrap().to_string().parse::<i32>().unwrap()), 
                         parentID: (parentID), 
                         memUsage: (process.memory()), 
-                        cpuUsage: (process.cpu_usage()), 
+                        cpuUsage: (t), 
                         user: (uName.unwrap().name().to_string_lossy().to_string()) });
                     data.push(allProcs);
                 }
             }
             else 
             {
+                let mut t:f64 = 0.;
+                for prc in procfs::process::all_processes().unwrap() {
+                    let p = prc.unwrap();
+                    let stat = p.stat().unwrap();
+                    let clk_tck : f64 = 100.;
+                    let utime_sec = stat.utime as f64 / clk_tck;
+                    let stime_sec = stat.stime as f64 / clk_tck;
+                    let starttime_sec = stat.starttime as f64 / clk_tck;
+                    let elapsed_sec = sys.uptime() as f64 - starttime_sec;
+                    let usage_sec = utime_sec + stime_sec;
+                    let cpu_usage1 = 100.0 * usage_sec / elapsed_sec;
+                    //println!("{}",cpu_usage1);
+                    // println!("{}",p.pid);
+                    if (p.pid == pid.to_string().parse::<i32>().unwrap())
+                    {
+                        t = cpu_usage1;
+                    }
+                }
                 let uName = users::get_user_by_uid(process.user_id().unwrap().to_string().parse().unwrap());
                 let mut parentID:i32 = 0;
                 if(process.parent() != None)
@@ -517,13 +597,15 @@ fn build_ui(app: &Application) {
                     // println!("{}",process.parent().unwrap().to_string());
                     parentID = process.parent().unwrap().to_string().parse::<i32>().unwrap();
                 }
+                let runtime = process.run_time();
+                // println!("{}",runtime);
                 let mut allProcs : Vec<proc> = vec![];
                 allProcs.push(proc { procID: (pid.to_string().parse::<i32>().unwrap()), 
                     procName: (process.name().to_string()), 
                     UID: (process.user_id().unwrap().to_string().parse::<i32>().unwrap()), 
                     parentID: (parentID), 
                     memUsage: (process.memory()), 
-                    cpuUsage: (process.cpu_usage()), 
+                    cpuUsage: (t), 
                     user: (uName.unwrap().name().to_string_lossy().to_string()) });
                 data.push(allProcs);
             }

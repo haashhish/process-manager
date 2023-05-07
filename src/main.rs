@@ -211,8 +211,9 @@ fn build_ui(app: &Application) {
     .build();
 
     let killLabel = gtk::Label::builder()
-    .label("Enter process PID:")
+    .label("    Enter process PID:")
     .build();
+    let killLabel_clone = killLabel.clone();
     
     let killField = gtk::Entry::builder()
     .build();
@@ -222,6 +223,11 @@ fn build_ui(app: &Application) {
     let killButton = gtk::Button::builder()
     .label("Kill process")
     .build();
+
+    let killResult = gtk::Label::builder()
+    .visible(false)
+    .build();
+    let killResult_clone = killResult.clone();
 
     let refreshRateField = gtk::Entry::builder()
     // .margin_start(500)
@@ -245,7 +251,7 @@ fn build_ui(app: &Application) {
     .build();
 
     let searchByLabel = gtk::Label::builder()
-    .label("Search by PID:")
+    .label("  Search by PID:")
     .build();
 
     let searchBox = gtk::Box::builder()
@@ -303,18 +309,29 @@ fn build_ui(app: &Application) {
 
     killButton.connect_clicked(move |_|{
         let data = unsafe{allData.to_vec()};
+        let mut isKilled:bool = false;
         let mut sys = System::new();
         sys.refresh_all();
         let enteredPID : i32 = killField_clone.text().to_string().parse::<i32>().unwrap();
         for i in data
         {
-            if(i[0].procID == enteredPID) ////////////////continue killingggg
+            if(i[0].procID == enteredPID)
             {
-                // let t:usize = enteredPID;
-                // if let Some(process) = sys.process(Pid::from(1)) {
-                //     process.kill();
-                // }
+                if let Some(process) = sys.process(Pid::from(enteredPID as usize)) {
+                    process.kill();
+                    isKilled = true;
+                }
             }
+        }
+        if(!isKilled)
+        {
+            killResult_clone.set_text("Process not found to be killed");
+            killResult_clone.set_visible(true);
+        }
+        else
+        {
+            killResult_clone.set_text("Process killed successfully");
+            killResult_clone.set_visible(true);
         }
     });
 
@@ -326,6 +343,7 @@ fn build_ui(app: &Application) {
     searchBox.append(&killLabel);
     searchBox.append(&killField);
     searchBox.append(&killButton);
+    searchBox.append(&killResult);
 
     let filterLabel = gtk::Label::builder()
     .label("  Filter by:    ")

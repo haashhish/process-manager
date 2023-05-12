@@ -1,4 +1,4 @@
-# process-manager
+# Linux Process manager
 The process manager project written in Rust is a useful tool for managing and monitoring the processes running on a system. 
 This project has several features, including the ability to display important process information such as PID, process name, UID, username, CPU usage, disk I/O, and memory usage.
 Additionally, the process manager includes customizable columns of information, allowing users to remove any column that is not relevant to their needs. 
